@@ -4,6 +4,8 @@ import datetime, re, shlex, sys
 sys.path.append("dox")
 # main class import
 from dox import *
+# utility functions
+from util import *
 
 class main:
     dox = None
@@ -16,8 +18,9 @@ class main:
         if not len(args):
             args = ["list"]
         self.cmd(args, False)
-        if self.needSave:
-            self.dox.saveTasks()
+        if not args[0] == "shell":
+            self.dox.saveTasks() 
+        # action performed required a save (ie. most things)
     def cmd(self, args, shell):
         args[0] = args[0].lower()
         print("")
@@ -25,32 +28,32 @@ class main:
         if args[0] == "dox" and shell:
             print("You don't need to prefix commands with \"dox\" here.")
         # show a list of all tasks
-        elif args[0] in ["list", "l"]:
+        elif args[0] in ["list", "ls", "l", "tasks", "all"]:
             self.list(args)
         # add a new task to the list
-        elif args[0] in ["add", "a"]:
+        elif args[0] in ["add", "a", "new", "task"]:
             self.add(args)
         # edit an existing task
-        elif args[0] in ["edit", "e"]:
+        elif args[0] in ["edit", "e", "change"]:
             self.edit(args)
         # show info about the task
-        elif args[0] in ["info", "i"]:
+        elif args[0] in ["info", "i", "details"]:
             self.info(args)
         # move a task in the list
-        elif args[0] in ["move", "m"]:
+        elif args[0] in ["move", "m", "reorder"]:
             self.move(args)
         # mark a task as complete
-        elif args[0] in ["done", "d"]:
+        elif args[0] in ["done", "do", "d"]:
             self.done(args)
         # unmark a task as complete
-        elif args[0] in ["undo", "d"]:
+        elif args[0] in ["undo", "undone", "u"]:
             self.undo(args)
         # remove a task without completing
-        elif args[0] in ["del", "x"]:
+        elif args[0] in ["delete", "del", "remove", "x"]:
             self.delete(args)
         # interactive DoX shell
-        elif args[0] == "shell":
-            # no recursion allowed :P
+        elif args[0] in ["shell", "sh", "cmd"]:
+            # no recursion allowed
             if shell:
                 print("You can't launch a shell from a shell...")
             else:
@@ -73,19 +76,23 @@ class main:
                         # quit command, end shell
                         if args[0] in ["exit", "quit", "q"]:
                             print("")
+                            if raw_input("Do you want to save changes (YES/no)? ") not in ["no", "n", "cancel"]:
+                                self.save(args)
+                            else:
+                                print("Ignoring changes since last save...")
                             sys.exit(0)
                         else:
                             # run command in shell mode
                             self.cmd(args, True)
         # reload the tasks file now (shell only)
-        elif args[0] in ["load", "o"]:
+        elif args[0] in ["load", "ld", "o", "read"]:
             if shell:
                 self.load(args)
             # not in a shell, nothing to do
             else:
                 print("Not running in a shell, so nothing to do here.")
         # save the tasks file now (shell only)
-        elif args[0] in ["save", "s"]:
+        elif args[0] in ["save", "s", "write"]:
             if shell:
                 self.save(args)
             # not in a shell, nothing to do
@@ -93,43 +100,63 @@ class main:
                 print("Not running in a shell, so nothing to do here.")
         # display command help
         elif args[0] in ["help", "h", "?"]:
-            # help text; prefix commands with "dox" when not in shell
-            print("""================================
-DoX: terminal to-do list manager
-================================
-
-Commands
+            # display full help on request
+            if len(args) > 1 and args[1] in ["more", "full", "doc", "docs", "man"]:
+                # help text; prefix commands with "dox" when not in shell
+                print("""{1}Commands
 --------
 {0}list [raw] [done] [+/-<field>] [#<tag>]
-{0}add [<title>] [~<desc>] [0|![![!]]|!<pri>] [#<tag>]
-{0}edit <id> [<title>] [~<desc>] [0|![![!]]|!<pri>] [#<tag>]
+{0}add [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
+{0}edit <id> [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
 {0}info <id>
 {0}move <id> [<pos>]
 {0}done|undo <id>
 {0}del <id>
-{1}
+{2}
 
 Listing your tasks
 ------------------
 * Use `{0}list` to show all tasks in your list.
-* Append `+<field>` for ascending sort, or `-<field>` for descending.
+* Append `+<field to sort by>` for ascending sort, or `-<field>` for descending.
 * Filter by tag adding `#<tag>`.
-* Mutliple sorts and filters can be used.
+* Mutliple sorts and filters can be used (sorts are applied in order).
 * Use raw to show your tasks as DoX strings (as they would appear in tasks.txt).
-* View more information on a task with `info <id>`.
+* View more information on a task with `{0}info <id>`.
+* Move tasks around in the list using `{0}move <id> <new position>`.
 
 Adding tasks
 ------------
 * Use `{0}add <title>` to add a quick task.
-* Add a description by appending `~<desc>`.
-* Wrap multiple word values in quotes.
-* Set the priority to `0`, or use up to three `!` marks for 1 to 3.
+* Add a description by appending `~<description>`.
+* Wrap multiple words in quotes.
+* The priority can be set with `!<level>`, for a level between `0` and `3`.  You can
+  also set the priority to `0`, or use up to three `!` marks for 1 to 3.
+* Set a due date with `@<when>`.  Absolute and relative (eg. "tomorrow") dates/times
+  are supported.  Split the date from the time using a `|`.
+* Make the task repeat with `&<when>`.  Enter a number of days or a relative time (eg.
+  "daily").  Repeats occur from the due date; append `*` to repeat from today instead.
 * Assign tags using `#<tag>`.  Multiple tags are written `#<tag1> #<tag2>...`.
 
 Completing tasks
 ----------------
 * Use `{0}done <id>` to mark a task as complete and remove it from the list.
-* Use `{0}del <id>` to remove without completing.""".format(("" if shell else "dox "), ("load|save\nhelp\nexit" if shell else "dox shell\ndox help")))
+* Undo a task with `{0}undo <id>` (you can find the new ID with `{0}list done`).
+* Use `{0}del <id>` to remove without completing.""".format(("" if shell else "dox "),
+                                                            ("" if shell else "DoX: terminal to-do list manager\n================================\n\n"),
+                                                            ("load|save\nhelp\nexit" if shell else "dox shell\ndox help")))
+            # quick command help
+            else:
+                print("""{1}List your tasks: {0}list
+Add a new task: {0}add [<title>] [~<desc>]
+                [!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
+Edit a task: {0}edit <id> [<title>] [~<desc>]
+             [!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
+Check info on a task: {0}info <id>
+Mark a task as complete: {0}done <id>
+Delete a task: {0}del <id>
+
+Try `{0}help more` for the full help documentation.""".format(("" if shell else "dox "),
+                                                              ("" if shell else "DoX: terminal to-do list manager\n================================\n\n")))
         # unrecognized command
         else:
             print("Unknown command \"{}\"; type \"{}help\" for a list of commands.".format(args[0], ("" if shell else "dox ")))
@@ -203,7 +230,7 @@ Completing tasks
                 for taskObj in tasks:
                     if taskObj.due:
                         today = datetime.datetime.today().date()
-                        due = taskObj.due.date()
+                        due = taskObj.due[0].date()
                         # show all tasks with a due date
                         cond = (keyword in ["due", "date", "time"])
                         # or only show tasks due today
@@ -225,26 +252,34 @@ Completing tasks
                 for taskObj in tasks:
                     print(taskObj)
             else:
+                idWidth = len(str(len(tasks)))
                 # table layout - four columns
-                tmpl = "{:1}  {:32}  {:1}  {:19}  {:32}"
+                tmpl = "{:>" + str(idWidth) + "}  {:32}  {:1}  {:19}  {:16}  {:32}"
+                # line fits all headers, plus space
+                horiz = "-" * (idWidth + 32 + 1 + 19 + 16 + 32 + (2 * 5))
                 # table header
-                print("-" * 93)
-                print(tmpl.format("#", "Task", "!", "Due", "Tags"))
-                print("-" * 93)
+                print(horiz)
+                print(tmpl.format("#", "Task", "!", "Due", "Repeat", "Tags"))
+                print(horiz)
                 for taskObj in tasks:
                     # table row
-                    print(tmpl.format(taskObj.id, (util.trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>"), taskObj.pri,
-                                      (taskObj.due.strftime("%d/%m/%Y %H:%M:%S") if taskObj.due else "<none>"),
-                                      util.trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
-                print("-" * 93)
+                    due = None
+                    if taskObj.due:
+                        due = prettyDue(taskObj.due)
+                    repeat = None
+                    if taskObj.repeat:
+                        repeat = prettyRepeat(taskObj.repeat)
+                    print(tmpl.format(taskObj.id, (trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>"), taskObj.pri,
+                                      (due if due else "<none>"), (repeat if repeat else "<none>"), trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
+                print(horiz)
         # no tasks in file
         else:
             print("No tasks in your list that match the current filters.")
     def add(self, args):
-        title, desc, pri, due, tags = util.parseArgs(args[1:])
+        title, desc, pri, due, repeat, tags = parseArgs(args[1:])
         if title or desc or pri or len(tags):
             # add task via DoX interface
-            self.dox.addTask(title, desc, pri, due, tags)
+            self.dox.addTask(title, desc, pri, due, repeat, tags)
             print("Added task \"{}\".".format(title))
         # no valid arguments given
         else:
@@ -256,9 +291,9 @@ Completing tasks
             if id > 0 and id <= len(self.dox.tasks):
                 # fetch the task
                 taskObj = self.dox.getTask(id)
-                title, desc, pri, due, tags = util.parseArgs(args[2:], taskObj.title, taskObj.desc, taskObj.pri, taskObj.due, taskObj.tags)
+                title, desc, pri, due, repeat, tags = parseArgs(args[2:], taskObj.title, taskObj.desc, taskObj.pri, taskObj.due, taskObj.repeat, taskObj.tags)
                 # edit task via DoX interface
-                self.dox.editTask(id, title, desc, pri, due, tags)
+                self.dox.editTask(id, title, desc, pri, due, repeat, tags)
                 print("Updated task \"{}\".".format(title))
             # invalid id
             else:
@@ -275,15 +310,24 @@ Completing tasks
                 taskObj = self.dox.getTask(id)
                 out = []
                 if taskObj.title:
+                    # title with underline
                     out.append("{}\n{}".format(taskObj.title, ("-" * len(taskObj.title))))
                     out.append("")
                 if taskObj.desc:
+                    # print description
                     out.append(taskObj.desc)
                     out.append("")
                 if taskObj.due:
-                    out.append("Due: {}".format(taskObj.due.strftime("%d/%m/%Y %H:%M:%S")))
-                out.append("Priority: {}".format(taskObj.pri))
+                    # print full date
+                    due = taskObj.due[0].strftime("%d/%m/%Y")
+                    if taskObj.due[1]:
+                        due = taskObj.due[0].strftime("%d/%m/%Y %H:%M:%S")
+                    out.append("Due: {}".format(due))
+                # print priority (even if 0)
+                pris = ["Low", "Medium", "High", "Critical"]
+                out.append("Priority: {} ({})".format(pris[taskObj.pri], taskObj.pri))
                 if taskObj.tags:
+                    # print tags
                     out.append("")
                     out.append("#{}".format(" #".join(taskObj.tags)))
                 print("\n".join(out))
@@ -354,8 +398,10 @@ Completing tasks
         if len(args) > 1 and args[1].isdigit() and not args[1] == "0":
             id = int(args[1])
             if id > 0 and id <= len(self.dox.tasks):
+                # fetch the task
                 taskObj = self.dox.getTask(id)
-                if raw_input("Deleting the task \"{}\", are you sure (yes/no)? ".format(taskObj.title)) in ["yes", "y"]:
+                # confirm deletion
+                if raw_input("Deleting the task \"{}\", are you sure (yes/NO)? ".format(taskObj.title)) in ["yes", "y"]:
                     self.dox.deleteTask(id)
                     print("Deleted task \"{}\".".format(taskObj.title))
                 else:
