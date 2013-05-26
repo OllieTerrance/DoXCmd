@@ -18,9 +18,8 @@ class main:
         if not len(args):
             args = ["list"]
         self.cmd(args, False)
-        if not args[0] == "shell":
-            self.dox.saveTasks() 
-        # action performed required a save (ie. most things)
+        # save after action
+        self.dox.saveTasks()
     def cmd(self, args, shell):
         args[0] = args[0].lower()
         print("")
@@ -49,10 +48,10 @@ class main:
         elif args[0] in ["undo", "undone", "u"]:
             self.undo(args)
         # remove a task without completing
-        elif args[0] in ["delete", "del", "remove", "x"]:
+        elif args[0] in ["delete", "del", "remove", "r", "x"]:
             self.delete(args)
         # interactive DoX shell
-        elif args[0] in ["shell", "sh", "cmd"]:
+        elif args[0] in ["shell", "sh", "cmd", "dox"]:
             # no recursion allowed
             if shell:
                 print("You can't launch a shell from a shell...")
@@ -68,22 +67,21 @@ class main:
                     except ValueError:
                         print("\nInvalid command; type \"help\" for a list of commands.\n")
                         args = []
-                    # user interrupted or ended session, end shell
-                    except (KeyboardInterrupt, EOFError):
-                        print("exit\n")
-                        sys.exit(0)
                     if len(args):
                         # quit command, end shell
-                        if args[0] in ["exit", "quit", "q"]:
-                            print("")
-                            if raw_input("Do you want to save changes (YES/no)? ") not in ["no", "n", "cancel"]:
-                                self.save(args)
-                            else:
-                                print("Ignoring changes since last save...")
+                        if args[0] in ["exit", "quit", "q", "qq"]:
+                            if not args[0] == "qq":
+                                print("")
+                                if raw_input("Do you want to save changes (YES/no)? ") not in ["no", "n", "cancel"]:
+                                    self.save(args)
+                                else:
+                                    print("Ignoring changes since last save.")
                             sys.exit(0)
                         else:
                             # run command in shell mode
                             self.cmd(args, True)
+                            # save after action
+                            self.dox.saveTasks()
         # reload the tasks file now (shell only)
         elif args[0] in ["load", "ld", "o", "read"]:
             if shell:
@@ -426,5 +424,14 @@ if __name__ == "__main__":
     if not "raw_input" in dir(__builtins__):
         def raw_input(prompt):
             return input(prompt)
-    # start!
-    main()
+    # start main loop
+    try:
+        main()
+    # user interrupted or ended session, end shell
+    except KeyboardInterrupt:
+        print("exit")
+        print("")
+        sys.exit(0)
+    except EOFError:
+        print("")
+        sys.exit(0)
