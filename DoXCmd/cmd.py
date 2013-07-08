@@ -23,6 +23,9 @@ class main:
     def cmd(self, args, shell):
         args[0] = args[0].lower()
         print("")
+        if shell:
+            # load before action
+            self.dox.loadTasks()
         # trying to use "dox" in a shell
         if args[0] == "dox" and shell:
             print("You don't need to prefix commands with \"dox\" here.")
@@ -68,14 +71,9 @@ class main:
                         print("\nInvalid command; type \"help\" for a list of commands.\n")
                         args = []
                     if len(args):
-                        # quit command, end shell
+                        # quit command
                         if args[0] in ["exit", "quit", "q", "qq"]:
-                            if not args[0] == "qq":
-                                print("")
-                                if raw_input("Do you want to save changes (YES/no)? ") not in ["no", "n", "cancel"]:
-                                    self.save(args)
-                                else:
-                                    print("Ignoring changes since last save.")
+                            # exit shell
                             sys.exit(0)
                         else:
                             # run command in shell mode
@@ -98,8 +96,20 @@ class main:
                 print("Not running in a shell, so nothing to do here.")
         # display command help
         elif args[0] in ["help", "h", "?"]:
+            # display help with config file
+            if len(args) > 1 and args[1] in ["config", "configuration", "settings"]:
+                print("""New task options
+----------------
+* newTaskTags: list of tags to set if none given
+* newTaskPriority: default priority to set if none given
+* newTaskDue: default due date to set if none given
+* newTaskRepeat: default repeat time to set if none given
+
+Task list options
+-----------------
+* listSort: default sorting, use + or - to set direction""")
             # display full help on request
-            if len(args) > 1 and args[1] in ["more", "full", "doc", "docs", "man"]:
+            elif len(args) > 1 and args[1] in ["more", "full", "doc", "docs", "man"]:
                 # help text; prefix commands with "dox" when not in shell
                 print("""{1}Commands
 --------
@@ -166,40 +176,45 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         toSub = []
         done = False
         raw = False
-        # additional arguments
-        if len(args) > 1:
-            # loop arguments
-            for i in range(1, len(args)):
-                arg = args[i]
-                # sort the list
-                if re.match("^[\+-]", arg):
-                    desc = arg[0] == "-"
-                    field = arg[1:]
-                    # user-friendly aliases
-                    if field in ["task", "name"]:
-                        field = "title"
-                    elif field in ["description", "details", "info", "~"]:
-                        field = "desc"
-                    elif field in ["priority", "!"]:
-                        field = "pri"
-                    elif field in ["date", "time", "@"]:
-                        field = "due"
-                    elif field in ["tag", "#"]:
-                        field = "tags"
-                    toSort.append((field, desc))
-                # filter by a tag
-                elif arg[0] == "#":
-                    toSub.append(("tag", arg[1:]))
-                # filter by due date
-                elif arg[0] == "@":
-                    tag = arg[1:]
-                    toSub.append(("due", arg[1:]))
-                # display from done list instead of to-do
-                elif arg == "done":
-                    done = True
-                # display DoX string format lines (ie. as they would appear in tasks.txt)
-                elif arg == "raw":
-                    raw = True
+        # no arguments given in command, use from config
+        if len(args) == 1:
+            try:
+                args.append(*shlex.split(self.dox.config["listSort"]))
+            except:
+                # no valid arguments
+                args = ["list"]
+        # loop arguments
+        for i in range(1, len(args)):
+            arg = args[i]
+            # sort the list
+            if re.match("^[\+-]", arg):
+                desc = arg[0] == "-"
+                field = arg[1:]
+                # user-friendly aliases
+                if field in ["task", "name"]:
+                    field = "title"
+                elif field in ["description", "details", "info", "~"]:
+                    field = "desc"
+                elif field in ["priority", "!"]:
+                    field = "pri"
+                elif field in ["date", "time", "@"]:
+                    field = "due"
+                elif field in ["tag", "#"]:
+                    field = "tags"
+                toSort.append((field, desc))
+            # filter by a tag
+            elif arg[0] == "#":
+                toSub.append(("tag", arg[1:]))
+            # filter by due date
+            elif arg[0] == "@":
+                tag = arg[1:]
+                toSub.append(("due", arg[1:]))
+            # display from done list instead of to-do
+            elif arg == "done":
+                done = True
+            # display DoX string format lines (ie. as they would appear in tasks.txt)
+            elif arg == "raw":
+                raw = True
         # if showing completed tasks, swap list to show
         if done:
             tasks = self.dox.done
@@ -313,7 +328,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                     out.append("")
                 if taskObj.desc:
                     # print description
-                    out.append(taskObj.desc)
+                    out.append(taskObj.desc.replace("\\", "\n"))
                     out.append("")
                 if taskObj.due:
                     # print full date
@@ -321,6 +336,9 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                     if taskObj.due[1]:
                         due = taskObj.due[0].strftime("%d/%m/%Y %H:%M:%S")
                     out.append("Due: {}".format(due))
+                if taskObj.repeat:
+                    # print pretty repeat
+                    out.append("Repeat: {}".format(prettyRepeat(taskObj.repeat)))
                 # print priority (even if 0)
                 pris = ["Low", "Medium", "High", "Critical"]
                 out.append("Priority: {} ({})".format(pris[taskObj.pri], taskObj.pri))
@@ -410,14 +428,6 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         # no valid arguments given
         else:
             print("Usage: del <id>")
-    def save(self, args):
-        # save tasks via DoX interface
-        self.dox.saveTasks()
-        print("Your tasks have been saved.")
-    def load(self, args):
-        # load tasks via DoX interface
-        self.dox.loadTasks()
-        print("Your tasks have been loaded.")
 
 if __name__ == "__main__":
     # Python 2/3 compatibility hack: allows use of raw_input in Python 3.x
