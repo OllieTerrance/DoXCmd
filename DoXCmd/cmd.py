@@ -113,7 +113,7 @@ Task list options
                 # help text; prefix commands with "dox" when not in shell
                 print("""{1}Commands
 --------
-{0}list [raw] [done] [+/-<field>] [#<tag>]
+{0}list [raw] [done] [+/-<field>] [!<pri>] [#<tag>] [@<due>]
 {0}add [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
 {0}edit <id> [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
 {0}info <id>
@@ -126,7 +126,10 @@ Listing your tasks
 ------------------
 * Use `{0}list` to show all tasks in your list.
 * Append `+<field to sort by>` for ascending sort, or `-<field>` for descending.
-* Filter by tag adding `#<tag>`.
+* Filter to specific tags by adding `#<tag>`.
+* Filter by minimum priority by adding `!<pri>`.
+* Only show tasks due on a certain date with `@<due>`.  Worded date expressions (e.g.
+  "today", "next week", "overdue") are also valid.
 * Mutliple sorts and filters can be used (sorts are applied in order).
 * Use raw to show your tasks as DoX strings (as they would appear in tasks.txt).
 * View more information on a task with `{0}info <id>`.
@@ -202,6 +205,9 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                 elif field in ["tag", "#"]:
                     field = "tags"
                 toSort.append((field, desc))
+            # filter by a priority
+            elif arg[0] == "!":
+                toSub.append(("pri", arg[1:]))
             # filter by a tag
             elif arg[0] == "#":
                 toSub.append(("tag", arg[1:]))
@@ -226,9 +232,23 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
             withField = sorted([x for x in tasks if not getattr(x, sort[0]) is None], key=(lambda x: getattr(x, sort[0])), reverse=sort[1])
             withoutField = [x for x in tasks if getattr(x, sort[0]) is None]
             tasks = withField + withoutField
-        # now filter by tags
+        # now filter by fields
         for sub in toSub:
-            if sub[0] == "tag":
+            if sub[0] == "pri":
+                pri = sub[1]
+                # check if a valid priority
+                if len(pri) == 1 and pri.isdigit():
+                    pri = int(pri)
+                    # ignore 0 as does not affect filter
+                    if 0 < pri <= 3:
+                        filtered = []
+                        # remove any tasks lower than given priority
+                        for taskObj in tasks:
+                            if taskObj.pri >= pri:
+                                filtered.append(taskObj)
+                        # replace task list
+                        tasks = filtered
+            elif sub[0] == "tag":
                 tag = sub[1]
                 filtered = []
                 # remove any tasks not matching the given tag
@@ -247,7 +267,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                         # show all tasks with a due date
                         cond = (keyword in ["due", "date", "time"])
                         # or only show tasks due today
-                        cond |= (keyword in ["today", "now"] and due == today)
+                        cond |= (keyword in ["today", "now"] and due <= today)
                         # or only show tasks due tomorrow
                         cond |= (keyword in ["tomorrow"] and due == today + datetime.timedelta(days=1))
                         # or only show tasks due in the next 7 days
