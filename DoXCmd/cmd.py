@@ -80,20 +80,6 @@ class main:
                             self.cmd(args, True)
                             # save after action
                             self.dox.saveTasks()
-        # reload the tasks file now (shell only)
-        elif args[0] in ["load", "ld", "o", "read"]:
-            if shell:
-                self.load(args)
-            # not in a shell, nothing to do
-            else:
-                print("Not running in a shell, so nothing to do here.")
-        # save the tasks file now (shell only)
-        elif args[0] in ["save", "s", "write"]:
-            if shell:
-                self.save(args)
-            # not in a shell, nothing to do
-            else:
-                print("Not running in a shell, so nothing to do here.")
         # display command help
         elif args[0] in ["help", "h", "?"]:
             # display help with config file
