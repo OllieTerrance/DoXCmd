@@ -118,8 +118,8 @@ Task list options
 {0}edit <id> [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
 {0}info <id>
 {0}move <id> [<pos>]
-{0}done|undo <id>
-{0}del <id>
+{0}done|undo <id> [<id>...]
+{0}del [<id>...] [<done>] [<id>...]
 {2}
 
 Listing your tasks
@@ -150,9 +150,11 @@ Adding tasks
 
 Completing tasks
 ----------------
-* Use `{0}done <id>` to mark a task as complete and remove it from the list.
+* Use `{0}done <id>` to complete one or more tasks, and remove them from the list.
 * Undo a task with `{0}undo <id>` (you can find the new ID with `{0}list done`).
-* Use `{0}del <id>` to remove without completing.""".format(("" if shell else "dox "),
+* Use `{0}del <id>` to remove without completing.
+* Delete completed tasks by writing `done` then the IDs.
+* You can mix imcomplete and done task deletion with `{0}del <id> done <id>`. """.format(("" if shell else "dox "),
                                                             ("" if shell else "DoX: terminal to-do list manager\n================================\n\n"),
                                                             ("load|save\nhelp\nexit" if shell else "dox shell\ndox help")))
             # quick command help
@@ -402,52 +404,90 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         else:
             print("Usage: move <id> [<pos>]")
     def done(self, args):
-        # if id is valid
-        if len(args) > 1 and args[1].isdigit() and not args[1] == "0":
-            id = int(args[1])
-            if id > 0 and id <= len(self.dox.tasks):
-                taskObj = self.dox.getTask(id)
-                self.dox.doneTask(id)
-                print("Completed task \"{}\".  Well done!".format(taskObj.title))
-            # invalid id
+        # store IDs to mark done
+        tasks = []
+        # extract task IDs
+        for arg in args[1:]:
+            if arg.isdigit() and not arg == "0" and 0 < int(arg) <= len(self.dox.tasks) and int(arg) not in tasks:
+                tasks.append(int(arg))
+        if len(tasks):
+            # complete single task straight away
+            if len(tasks) == 1:
+                taskObj = self.dox.getTask(tasks[0])
+                self.dox.doneTask(tasks[0])
+                print("Marked \"{}\" complete.  Well done!".format(taskObj.title))
+            # confirm done if multiple
+            elif raw_input("Marking {} tasks as complete, are you sure (YES/no)? ".format(len(tasks))) not in ["no", "n"]:
+                # do in reverse to avoid ID conflicts
+                for id in sorted(tasks, reverse=True):
+                    self.dox.doneTask(id)
+                print("Marked {} tasks.  Well done!".format(len(tasks)))
+            # aborted on confirm
             else:
-                print("No task found for ID \"{}\".".format(id))
+                print("Aborted.")
         # no valid arguments given
         else:
-            print("Usage: done <id>")
+            print("Usage: done <id> [<id>...]")
     def undo(self, args):
-        # if id is valid
-        if len(args) > 1 and args[1].isdigit() and not args[1] == "0":
-            id = int(args[1])
-            if id > 0 and id <= len(self.dox.done):
-                taskObj = self.dox.getDone(id)
-                self.dox.undoTask(id)
-                print("Reverted state of task \"{}\"...".format(taskObj.title))
-            # invalid id
+        # store IDs to mark done
+        done = []
+        # extract task IDs
+        for arg in args[1:]:
+            if arg.isdigit() and not arg == "0" and 0 < int(arg) <= len(self.dox.done) and int(arg) not in done:
+                done.append(int(arg))
+        if len(done):
+            # complete single task straight away
+            if len(done) == 1:
+                taskObj = self.dox.getTask(done[0], False)
+                self.dox.undoTask(done[0])
+                print("Unmarked \"{}\" complete.  Oh...".format(taskObj.title))
+            # confirm done if multiple
+            elif raw_input("Unmarking {} tasks as complete, are you sure (YES/no)? ".format(len(done))) not in ["no", "n"]:
+                # do in reverse to avoid ID conflicts
+                for id in sorted(done, reverse=True):
+                    self.dox.undoTask(id)
+                print("Unmarked {} tasks.  Oh...".format(len(done)))
+            # aborted on confirm
             else:
-                print("No task found for ID \"{}\".".format(id))
+                print("Aborted.")
         # no valid arguments given
         else:
-            print("Usage: undo <id>")
+            print("Usage: undo <id> [<id>...]")
     def delete(self, args):
-        # if id is valid
-        if len(args) > 1 and args[1].isdigit() and not args[1] == "0":
-            id = int(args[1])
-            if id > 0 and id <= len(self.dox.tasks):
-                # fetch the task
-                taskObj = self.dox.getTask(id)
-                # confirm deletion
-                if raw_input("Deleting the task \"{}\", are you sure (yes/NO)? ".format(taskObj.title)) in ["yes", "y"]:
+        # store IDs to delete
+        tasks = []
+        done = []
+        # check done tasks after toggle
+        switchDone = False
+        # extract task IDs
+        for arg in args[1:]:
+            if arg.isdigit() and not arg == "0":
+                id = int(arg)
+                if switchDone and 0 < id <= len(self.dox.done):
+                    done.append(id)
+                elif 0 < id <= len(self.dox.tasks):
+                    tasks.append(id)
+            elif arg in ["done", "d"]:
+                switchDone = True
+        # confirm deletion
+        output = []
+        if len(tasks):
+            output.append("{} uncompleted task{}".format(len(tasks), "" if len(tasks) == 1 else "s"))
+        if len(done):
+            output.append("{} completed task{}".format(len(done), "" if len(done) == 1 else "s"))
+        if len(output):
+            if raw_input("Deleting {}, are you sure (yes/NO)? ".format(" and ".join(output))) in ["yes", "y"]:
+                # do in reverse to avoid ID conflicts
+                for id in sorted(tasks, reverse=True):
                     self.dox.deleteTask(id)
-                    print("Deleted task \"{}\".".format(taskObj.title))
-                else:
-                    print("Aborted, kept the task.")
-            # invalid id
+                for id in sorted(done, reverse=True):
+                    self.dox.deleteTask(id, False)
+                print("Deleted {} task{}...  :(".format(len(tasks + done), "" if len(tasks + done) == 1 else "s"))
             else:
-                print("No task found for ID \"{}\".".format(id))
+                print("Aborted.")
         # no valid arguments given
         else:
-            print("Usage: del <id>")
+            print("Usage: del [<id>...] [<done>] [<id>...]")
 
 if __name__ == "__main__":
     # Python 2/3 compatibility hack: allows use of raw_input in Python 3.x
