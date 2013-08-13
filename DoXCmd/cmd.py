@@ -182,16 +182,18 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                 desc = arg[0] == "-"
                 field = arg[1:]
                 # user-friendly aliases
-                if field in ["task", "name"]:
+                if field in ["title", "task", "name"]:
                     field = "title"
-                elif field in ["description", "details", "info", "~"]:
-                    field = "desc"
-                elif field in ["priority", "!"]:
+                elif field in ["pri", "priority", "!"]:
                     field = "pri"
-                elif field in ["date", "time", "@"]:
+                elif field in ["due", "date", "time", "when", "@"]:
                     field = "due"
-                elif field in ["tag", "#"]:
+                elif field in ["tags", "tag", "#"]:
                     field = "tags"
+                # unrecognized field, ignore it
+                else:
+                    continue
+                # sort by field later
                 toSort.append((field, desc))
             # filter by a priority
             elif arg[0] == "!":
