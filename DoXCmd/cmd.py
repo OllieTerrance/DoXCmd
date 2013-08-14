@@ -42,13 +42,13 @@ class main:
         elif args[0] in ["info", "i", "details"]:
             self.info(args)
         # move a task in the list
-        elif args[0] in ["move", "m", "reorder"]:
+        elif args[0] in ["move", "mv", "m", "reorder"]:
             self.move(args)
         # mark a task as complete
-        elif args[0] in ["done", "do", "d"]:
+        elif args[0] in ["done", "do", "d", "complete"]:
             self.done(args)
         # unmark a task as complete
-        elif args[0] in ["undo", "undone", "u"]:
+        elif args[0] in ["undo", "undone", "u", "incomplete"]:
             self.undo(args)
         # remove a task without completing
         elif args[0] in ["delete", "del", "remove", "r", "x"]:
@@ -101,11 +101,11 @@ Task list options
 --------
 {0}list [raw] [done] [+/-<field>] [!<pri>] [#<tag>] [@<due>]
 {0}add [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
-{0}edit <id> [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
-{0}info <id>
-{0}move <id> [<pos>]
-{0}done|undo <id> [<id>...]
-{0}del [<id>...] [<done>] [<id>...]
+{0}edit <pos> [<title>] [~<desc>] [0|![![!]]|!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
+{0}info <pos>
+{0}move <pos> [<pos>]
+{0}done|undo <pos> [<pos>...]
+{0}del [<pos>...] [<done>] [<pos>...]
 {2}
 
 Listing your tasks
@@ -118,8 +118,8 @@ Listing your tasks
   "today", "next week", "overdue") are also valid.
 * Mutliple sorts and filters can be used (sorts are applied in order).
 * Use raw to show your tasks as DoX strings (as they would appear in tasks.txt).
-* View more information on a task with `{0}info <id>`.
-* Move tasks around in the list using `{0}move <id> <new position>`.
+* View more information on a task with `{0}info <pos>`.
+* Move tasks around in the list using `{0}move <pos> <new position>`.
 
 Adding tasks
 ------------
@@ -136,11 +136,11 @@ Adding tasks
 
 Completing tasks
 ----------------
-* Use `{0}done <id>` to complete one or more tasks, and remove them from the list.
-* Undo a task with `{0}undo <id>` (you can find the new ID with `{0}list done`).
-* Use `{0}del <id>` to remove without completing.
+* Use `{0}done <pos>` to complete one or more tasks, and remove them from the list.
+* Undo a task with `{0}undo <pos>` (you can find the new position with `{0}list done`).
+* Use `{0}del <pos>` to remove without completing.
 * Delete completed tasks by writing `done` then the IDs.
-* You can mix imcomplete and done task deletion with `{0}del <id> done <id>`. """.format(("" if shell else "dox "),
+* You can mix imcomplete and done task deletion with `{0}del <pos> done <pos>`. """.format(("" if shell else "dox "),
                                                             ("" if shell else "DoX: terminal to-do list manager\n================================\n\n"),
                                                             ("load|save\nhelp\nexit" if shell else "dox shell\ndox help")))
             # quick command help
@@ -148,11 +148,11 @@ Completing tasks
                 print("""{1}List your tasks: {0}list
 Add a new task: {0}add [<title>] [~<desc>]
                 [!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
-Edit a task: {0}edit <id> [<title>] [~<desc>]
+Edit a task: {0}edit <pos> [<title>] [~<desc>]
              [!<pri>] [@<due>] [&<repeat>[*]] [#<tag>]
-Check info on a task: {0}info <id>
-Mark a task as complete: {0}done <id>
-Delete a task: {0}del <id>
+Check info on a task: {0}info <pos>
+Mark a task as complete: {0}done <pos>
+Delete a task: {0}del <pos>
 
 Try `{0}help more` for the full help documentation.""".format(("" if shell else "dox "),
                                                               ("" if shell else "DoX: terminal to-do list manager\n================================\n\n")))
@@ -161,7 +161,6 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
             print("Unknown command \"{}\"; type \"{}help\" for a list of commands.".format(args[0], ("" if shell else "dox ")))
         print("")
     def list(self, args):
-        tasks = self.dox.tasks
         # to handle after all arguments searched
         toSort = []
         toSub = []
@@ -211,17 +210,8 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
             # display DoX string format lines (ie. as they would appear in tasks.txt)
             elif arg == "raw":
                 raw = True
-        # if showing completed tasks, swap list to show
-        if done:
-            tasks = self.dox.done
-        # reverse sort arguments (so first sort field is applied last but appears first)
-        toSort.reverse()
-        # apply sort in order
-        for sort in toSort:
-            # sort with undefined items at bottom regardless of order
-            withField = sorted([x for x in tasks if not getattr(x, sort[0]) is None], key=(lambda x: getattr(x, sort[0])), reverse=sort[1])
-            withoutField = [x for x in tasks if getattr(x, sort[0]) is None]
-            tasks = withField + withoutField
+        # fetch list of tasks
+        tasks = self.dox.getAllTasks(not done)
         # now filter by fields
         for sub in toSub:
             if sub[0] == "pri":
@@ -271,35 +261,46 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                 tasks = filtered
         # if there are tasks
         if len(tasks):
+            # reverse sort arguments (so first sort field is applied last but appears first)
+            toSort.reverse()
+            # apply sort in order
+            for sort in toSort:
+                # sort with undefined items at bottom regardless of order
+                withField = sorted([x for x in tasks if not getattr(x, sort[0]) is None], key=(lambda x: getattr(x, sort[0])), reverse=sort[1])
+                withoutField = [x for x in tasks if getattr(x, sort[0]) is None]
+                tasks = withField + withoutField
+            # print DoX format strings
             if raw:
                 for taskObj in tasks:
                     print(taskObj)
+            # print a table of tasks
             else:
-                idWidth = len(str(len(tasks)))
+                posWidth = len(str(len(tasks)))
                 # table layout - four columns
-                tmpl = "{:>" + str(idWidth) + "}  {:32}  {:1}  {:19}  {:16}  {:32}"
+                tmpl = "{:>" + str(posWidth) + "}  {:32}  {:1}  {:19}  {:16}  {:32}"
                 # line fits all headers, plus space
-                horiz = "-" * (idWidth + 32 + 1 + 19 + 16 + 32 + (2 * 5))
+                horiz = "-" * (posWidth + 32 + 1 + 19 + 16 + 32 + (2 * 5))
                 # table header
                 print(horiz)
-                print(tmpl.format("#", "Task", "!", "Due", "Repeat", "Tags"))
+                print(tmpl.format("", "Task", "!", "Due", "Repeat", "Tags"))
                 print(horiz)
                 for taskObj in tasks:
                     # table row
+                    pos = self.dox.idToPos(taskObj.id, not done)
                     due = None
                     if taskObj.due:
                         due = prettyDue(taskObj.due)
                     repeat = None
                     if taskObj.repeat:
                         repeat = prettyRepeat(taskObj.repeat)
-                    print(tmpl.format(taskObj.id, (trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>"), taskObj.pri,
-                                      (due if due else "<none>"), (repeat if repeat else "<none>"), trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
+                    print(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri, due if due else "<none>",
+                                      repeat if repeat else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
                 print(horiz)
         # no tasks in file
         else:
             print("No tasks in your list that match the current filters.")
     def add(self, args):
-        title, desc, pri, due, repeat, tags = parseArgs(args[1:])
+        id, title, desc, pri, due, repeat, tags = parseArgs(args[1:], False)
         if title or desc or pri or len(tags):
             # add task via DoX interface
             self.dox.addTask(title, desc, pri, due, repeat, tags)
@@ -308,29 +309,29 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         else:
             print("Usage: add [<title>] [~<desc>] [0|![![!]]] [#<tag>]")
     def edit(self, args):
-        # if id is valid
+        # if position is valid
         if len(args) > 2 and args[1].isdigit() and not args[1] == "0":
-            id = int(args[1])
-            if id > 0 and id <= len(self.dox.tasks):
+            pos = int(args[1])
+            if pos > 0 and pos <= self.dox.getCount():
                 # fetch the task
-                taskObj = self.dox.getTask(id)
-                title, desc, pri, due, repeat, tags = parseArgs(args[2:], taskObj.title, taskObj.desc, taskObj.pri, taskObj.due, taskObj.repeat, taskObj.tags)
+                taskObj = self.dox.getNthTask(pos)
+                id, title, desc, pri, due, repeat, tags = parseArgs(args[2:], taskObj.id, taskObj.title, taskObj.desc, taskObj.pri, taskObj.due, taskObj.repeat, taskObj.tags)
                 # edit task via DoX interface
                 self.dox.editTask(id, title, desc, pri, due, repeat, tags)
                 print("Updated task \"{}\".".format(title))
             # invalid id
             else:
-                print("No task found for ID \"{}\".".format(id))
+                print("No task found at position {}.".format(pos))
         # no valid arguments given
         else:
-            print("Usage: edit <id> [<title>] [~<desc>] [0|![![!]]] [#<tag>]")
+            print("Usage: edit <pos> [<title>] [~<desc>] [0|![![!]]] [#<tag>]")
     def info(self, args):
-        # if id is valid
-        if len(args) > 1     and args[1].isdigit() and not args[1] == "0":
-            id = int(args[1])
-            if id > 0 and id <= len(self.dox.tasks):
+        # if position is valid
+        if len(args) > 1 and args[1].isdigit() and not args[1] == "0":
+            pos = int(args[1])
+            if pos > 0 and pos <= self.dox.getCount():
                 # fetch the task
-                taskObj = self.dox.getTask(id)
+                taskObj = self.dox.getNthTask(pos)
                 out = []
                 if taskObj.title:
                     # title with underline
@@ -359,38 +360,38 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                 print("\n".join(out))
             # invalid id
             else:
-                print("No task found for ID \"{}\".".format(id))
+                print("No task found at position {}.".format(pos))
         # no valid arguments given
         else:
-            print("Usage: info <id>")
+            print("Usage: info <pos>")
     def move(self, args):
-        # if id is valid
+        # if position is valid
         if len(args) >= 2 and args[1].isdigit() and not args[1] == "0":
-            id = int(args[1])
+            pos = int(args[1])
             # default to move to end of list
-            pos = len(self.dox.tasks)
+            newPos = self.dox.getCount()
             if len(args) >= 3:
-                # if pos is valid
+                # if position is valid
                 if args[2] in ["0", "start", "front", "top", "first"]:
-                    pos = 1
+                    newPos = 1
                 elif args[2].isdigit():
-                    pos = int(args[2])
-                    if pos > len(self.dox.tasks):
-                        pos = len(self.dox.tasks)
+                    newPos = int(args[2])
+                    if newPos > self.dox.getCount():
+                        newPos = self.dox.getCount()
             # if valid move
-            if id > 0 and id <= len(self.dox.tasks):
-                # id and pos different
-                if not id == pos:
-                    self.dox.moveTask(id, pos)
-                    print("Moved task from position {} to {}.".format(id, pos))
+            if pos > 0 and pos <= self.dox.getCount():
+                # if new and old positions different
+                if not pos == newPos:
+                    self.dox.moveNthTask(pos, newPos)
+                    print("Moved task from position {} to {}.".format(pos, newPos))
                 else:
                     print("The task is already in that position.")
-            # invalid id
+            # invalid position
             else:
-                print("No task found for ID \"{}\".".format(id))
+                print("No task found at position {}.".format(pos))
         # no valid arguments given
         else:
-            print("Usage: move <id> [<pos>]")
+            print("Usage: move <pos> [<newPos>]")
     def done(self, args):
         # store IDs to mark done
         tasks = []
@@ -401,46 +402,46 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         if len(tasks):
             # complete single task straight away
             if len(tasks) == 1:
-                taskObj = self.dox.getTask(tasks[0])
-                self.dox.doneTask(tasks[0])
+                taskObj = self.dox.getNthTask(tasks[0])
+                self.dox.doneNthTask(tasks[0])
                 print("Marked \"{}\" complete.  Well done!".format(taskObj.title))
             # confirm done if multiple
             elif raw_input("Marking {} tasks as complete, are you sure (YES/no)? ".format(len(tasks))) not in ["no", "n"]:
-                # do in reverse to avoid ID conflicts
-                for id in sorted(tasks, reverse=True):
-                    self.dox.doneTask(id)
+                # do in reverse to avoid position conflicts
+                for pos in sorted(tasks, reverse=True):
+                    self.dox.doneNthTask(pos)
                 print("Marked {} tasks.  Well done!".format(len(tasks)))
             # aborted on confirm
             else:
                 print("Aborted.")
         # no valid arguments given
         else:
-            print("Usage: done <id> [<id>...]")
+            print("Usage: done <pos> [<pos>...]")
     def undo(self, args):
         # store IDs to mark done
         done = []
         # extract task IDs
         for arg in args[1:]:
-            if arg.isdigit() and not arg == "0" and 0 < int(arg) <= len(self.dox.done) and int(arg) not in done:
+            if arg.isdigit() and not arg == "0" and 0 < int(arg) <= self.dox.getCount(False) and int(arg) not in done:
                 done.append(int(arg))
         if len(done):
             # complete single task straight away
             if len(done) == 1:
-                taskObj = self.dox.getTask(done[0], False)
-                self.dox.undoTask(done[0])
+                taskObj = self.dox.getNthTask(done[0], False)
+                self.dox.undoNthTask(done[0])
                 print("Unmarked \"{}\" complete.  Oh...".format(taskObj.title))
             # confirm done if multiple
             elif raw_input("Unmarking {} tasks as complete, are you sure (YES/no)? ".format(len(done))) not in ["no", "n"]:
-                # do in reverse to avoid ID conflicts
-                for id in sorted(done, reverse=True):
-                    self.dox.undoTask(id)
+                # do in reverse to avoid position conflicts
+                for pos in sorted(done, reverse=True):
+                    self.dox.undoNthTask(pos)
                 print("Unmarked {} tasks.  Oh...".format(len(done)))
             # aborted on confirm
             else:
                 print("Aborted.")
         # no valid arguments given
         else:
-            print("Usage: undo <id> [<id>...]")
+            print("Usage: undo <pos> [<pos>...]")
     def delete(self, args):
         # store IDs to delete
         tasks = []
@@ -450,11 +451,11 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         # extract task IDs
         for arg in args[1:]:
             if arg.isdigit() and not arg == "0":
-                id = int(arg)
-                if switchDone and 0 < id <= len(self.dox.done):
-                    done.append(id)
-                elif 0 < id <= len(self.dox.tasks):
-                    tasks.append(id)
+                pos = int(arg)
+                if switchDone and 0 < pos <= self.dox.getCount(False):
+                    done.append(pos)
+                elif 0 < pos <= self.dox.getCount():
+                    tasks.append(pos)
             elif arg in ["done", "d"]:
                 switchDone = True
         # confirm deletion
@@ -466,16 +467,16 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         if len(output):
             if raw_input("Deleting {}, are you sure (yes/NO)? ".format(" and ".join(output))) in ["yes", "y"]:
                 # do in reverse to avoid ID conflicts
-                for id in sorted(tasks, reverse=True):
-                    self.dox.deleteTask(id)
-                for id in sorted(done, reverse=True):
-                    self.dox.deleteTask(id, False)
+                for pos in sorted(tasks, reverse=True):
+                    self.dox.deleteNthTask(pos)
+                for pos in sorted(done, reverse=True):
+                    self.dox.deleteNthTask(pos, False)
                 print("Deleted {} task{}...  :(".format(len(tasks + done), "" if len(tasks + done) == 1 else "s"))
             else:
                 print("Aborted.")
         # no valid arguments given
         else:
-            print("Usage: del [<id>...] [<done>] [<id>...]")
+            print("Usage: del [<pos>...] [<done>] [<pos>...]")
 
 if __name__ == "__main__":
     # Python 2/3 compatibility hack: allows use of raw_input in Python 3.x
