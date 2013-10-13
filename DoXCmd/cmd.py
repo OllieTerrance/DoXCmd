@@ -1,11 +1,7 @@
 # some other useful imports
 import datetime, re, shlex, sys
-# add DoX core to path
-sys.path.append("dox")
 # main class import
-from dox import *
-# utility functions
-from util import *
+from DoX.core import *
 
 class main:
     dox = None
@@ -72,7 +68,7 @@ class main:
                         args = []
                     if len(args):
                         # quit command
-                        if args[0] in ["exit", "quit", "q", "qq"]:
+                        if args[0] in ["exit", "quit", "q", "qq", ""]:
                             # exit shell
                             sys.exit(0)
                         else:
