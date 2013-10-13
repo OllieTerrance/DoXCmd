@@ -271,14 +271,15 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                     print(taskObj)
             # print a table of tasks
             else:
+                isTasks = not done
                 posWidth = len(str(len(tasks)))
                 # table layout - four columns
-                tmpl = "{:>" + str(posWidth) + "}  {:32}  {:1}  {:19}  {:16}  {:32}"
+                tmpl = "{:>" + str(posWidth) + "}  {:32}  {:1}  {:19} " + (" {:16} " if isTasks else "") + " {:32}"
                 # line fits all headers, plus space
-                horiz = "-" * (posWidth + 32 + 1 + 19 + 16 + 32 + (2 * 5))
+                horiz = "-" * (posWidth + 32 + 1 + 19 + (16 if isTasks else 0) + 32 + (2 * (5 if isTasks else 4)))
                 # table header
                 print(horiz)
-                print(tmpl.format("", "Task", "!", "Due", "Repeat", "Tags"))
+                print(tmpl.format("", "Task", "!", "Due", "Repeat", "Tags") if isTasks else tmpl.format("", "Task", "!", "Due", "Tags"))
                 print(horiz)
                 for taskObj in tasks:
                     # table row
@@ -289,8 +290,12 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                     repeat = None
                     if taskObj.repeat:
                         repeat = prettyRepeat(taskObj.repeat)
-                    print(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri, due if due else "<none>",
-                                      repeat if repeat else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
+                    if isTasks:
+                        print(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri, due if due else "<none>",
+                                          repeat if repeat else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
+                    else:
+                        print(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri,
+                                          due if due else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
                 print(horiz)
         # no tasks in file
         else:
