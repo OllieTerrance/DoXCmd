@@ -1,5 +1,5 @@
 # some other useful imports
-import datetime, re, shlex, sys
+import datetime, re, sys
 # main class import
 from DoX.core import *
 
@@ -61,7 +61,7 @@ class main:
                 while True:
                     try:
                         # get a command
-                        args = shlex.split(raw_input("DoX > "))
+                        args = shlexSplit(raw_input("DoX > "))
                     # parse error (e.g. no closing quote)
                     except ValueError:
                         print("\nInvalid command; type \"help\" for a list of commands.\n")
@@ -136,7 +136,7 @@ Completing tasks
 * Undo a task with `{0}undo <pos>` (you can find the new position with `{0}list done`).
 * Use `{0}del <pos>` to remove without completing.
 * Delete completed tasks by writing `done` then the IDs.
-* You can mix imcomplete and done task deletion with `{0}del <pos> done <pos>`. """.format(("" if shell else "dox "),
+* You can mix imcomplete and done task deletion with `{0}del <pos> done <pos>`.""".format(("" if shell else "dox "),
                                                             ("" if shell else "DoX: terminal to-do list manager\n================================\n\n"),
                                                             ("load|save\nhelp\nexit" if shell else "dox shell\ndox help")))
             # quick command help
@@ -165,7 +165,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         # no arguments given in command, use from config
         if len(args) == 1:
             try:
-                args.append(*shlex.split(self.dox.config["listSort"]))
+                args.append(*shlexSplit(self.dox.config["listSort"]))
             except:
                 # no valid arguments
                 args = ["list"]
@@ -291,11 +291,11 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                     if taskObj.repeat:
                         repeat = prettyRepeat(taskObj.repeat)
                     if isTasks:
-                        print(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri, due if due else "<none>",
-                                          repeat if repeat else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
+                        uprint(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri, due if due else "<none>",
+                                             repeat if repeat else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
                     else:
-                        print(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri,
-                                          due if due else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
+                        uprint(tmpl.format(pos, trunc(taskObj.title, 32) if taskObj.title else "<unnamed task>", taskObj.pri,
+                                             due if due else "<none>", trunc(", ".join(taskObj.tags), 32) if taskObj.tags else "<none>"))
                 print(horiz)
         # no tasks in file
         else:
@@ -305,7 +305,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
         if title or desc or pri or len(tags):
             # add task via DoX interface
             self.dox.addTask(title, desc, pri, due, repeat, tags)
-            print("Added task \"{}\".".format(title))
+            uprint("Added task \"{}\".".format(title))
         # no valid arguments given
         else:
             print("Usage: add [<title>] [~<desc>] [0|![![!]]] [#<tag>]")
@@ -319,7 +319,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                 id, title, desc, pri, due, repeat, tags = parseArgs(args[2:], taskObj.id, taskObj.title, taskObj.desc, taskObj.pri, taskObj.due, taskObj.repeat, taskObj.tags)
                 # edit task via DoX interface
                 self.dox.editTask(id, title, desc, pri, due, repeat, tags)
-                print("Updated task \"{}\".".format(title))
+                uprint("Updated task \"{}\".".format(title))
             # invalid id
             else:
                 print("No task found at position {}.".format(pos))
@@ -358,7 +358,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
                     # print tags
                     out.append("")
                     out.append("#{}".format(" #".join(taskObj.tags)))
-                print("\n".join(out))
+                uprint("\n".join(out))
             # invalid id
             else:
                 print("No task found at position {}.".format(pos))
@@ -405,7 +405,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
             if len(tasks) == 1:
                 taskObj = self.dox.getNthTask(tasks[0])
                 self.dox.doneNthTask(tasks[0])
-                print("Marked \"{}\" complete.  Well done!".format(taskObj.title))
+                uprint("Marked \"{}\" complete.  Well done!".format(taskObj.title))
             # confirm done if multiple
             elif raw_input("Marking {} tasks as complete, are you sure (YES/no)? ".format(len(tasks))) not in ["no", "n"]:
                 # do in reverse to avoid position conflicts
@@ -430,7 +430,7 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
             if len(done) == 1:
                 taskObj = self.dox.getNthTask(done[0], False)
                 self.dox.undoNthTask(done[0])
-                print("Unmarked \"{}\" complete.  Oh...".format(taskObj.title))
+                uprint("Unmarked \"{}\" complete.  Oh...".format(taskObj.title))
             # confirm done if multiple
             elif raw_input("Unmarking {} tasks as complete, are you sure (YES/no)? ".format(len(done))) not in ["no", "n"]:
                 # do in reverse to avoid position conflicts
@@ -480,10 +480,16 @@ Try `{0}help more` for the full help documentation.""".format(("" if shell else 
             print("Usage: del [<pos>...] [<done>] [<pos>...]")
 
 if __name__ == "__main__":
-    # Python 2/3 compatibility hack: allows use of raw_input in Python 3.x
+    # compatibility hack: allows use of raw_input in Python 3.x
     if not "raw_input" in dir(__builtins__):
         def raw_input(prompt):
             return input(prompt)
+    # compatibility hack: print wrapper to strip unicode if not supported
+    def uprint(string):
+        if sys.stdout.encoding == "UTF-8":
+            print(string)
+        else:
+            print("".join(map((lambda x: x if ord(x) < 128 else "?"), string)))
     # start main loop
     try:
         main()
