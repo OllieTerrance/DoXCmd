@@ -11,7 +11,7 @@ The shell command provides an interpreter to read a series of DoX commands witho
 Prerequisites
 -------------
 
-This program relies on the DoX API, which is not included in this package.  You must [download](http://github.com/OllieTerrance/DoX) and install it separately, then provide a copy of the files (through symlink or otherwise) in a `dox` folder within the `DoXCmd` folder.
+This program relies on the DoX API, which is not included in this package.  You must [download](http://github.com/OllieTerrance/DoX) it, and either install it as a Python module, or provide a copy of the files (through symlink or otherwise) in a `DoX` folder within the `DoXCmd` folder.
 
 
 Commands
